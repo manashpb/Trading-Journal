@@ -1,0 +1,17 @@
+{
+  "name": "trading-journal",
+  "version": "1.0.0",
+  "description": "Comprehensive trading journal for prop firm trades",
+  "private": true,
+  "scripts": {
+    "setup": "npm install --prefix server && npm install --prefix client",
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "start": "npm run dev:server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Database & user data
+server/trading.db
+server/snapshots/*.png
+server/snapshots/*.jpg
+server/snapshots/*.jpeg
+server/snapshots/*.gif
+
+# Env
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TS build info
+*.tsbuildinfo
+client/src/assets/
