@@ -4,7 +4,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', '..', 'trading.db');
+const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'journal.db');
 
 export class Database {
   private db: sqlite3.Database;
@@ -15,13 +15,13 @@ export class Database {
     this.db.exec('PRAGMA foreign_keys = ON');
   }
 
-  initialize() {
+  async initialize() {
     this.db.serialize(() => {
       this.db.run(`
         CREATE TABLE IF NOT EXISTS instruments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT UNIQUE NOT NULL,
-          type TEXT CHECK(type IN ('CFD', 'Futures')) NOT NULL,
+          type TEXT CHECK(type IN ('CFD', 'Futures', 'Option', 'Equity')) NOT NULL,
           pointValue REAL NOT NULL,
           createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -51,7 +51,7 @@ export class Database {
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           instrumentId INTEGER NOT NULL,
           direction TEXT CHECK(direction IN ('Long', 'Short')) NOT NULL,
-          contractType TEXT CHECK(contractType IN ('CFD', 'Futures')) NOT NULL,
+          contractType TEXT CHECK(contractType IN ('CFD', 'Futures', 'Option', 'Equity')) NOT NULL,
           entryDateTime TEXT NOT NULL,
           entryPrice REAL NOT NULL,
           slPrice REAL,
@@ -88,11 +88,44 @@ export class Database {
         )
       `);
 
-      console.log('Database initialized');
+
     });
+    await this.migrateFramework();
   }
 
+  async migrateFramework() {
+    const columns = await this.all('PRAGMA table_info(trades)');
+    const additions: Record<string, string> = {
+      profile: "TEXT NOT NULL DEFAULT 'prop'", holdingStyle: "TEXT NOT NULL DEFAULT 'Intraday'",
+      assetType: "TEXT NOT NULL DEFAULT 'CFD'", account: "TEXT NOT NULL DEFAULT 'Personal'",
+      strategy: "TEXT NOT NULL DEFAULT ''", plannedRisk: 'REAL', costs: 'REAL NOT NULL DEFAULT 0',
+      capitalCommitted: 'REAL', grossPnl: 'REAL', framework: 'TEXT', multiplier: 'REAL'
+    };
+    for (const [name, definition] of Object.entries(additions)) {
+      if (!columns.some(c => c.name === name)) await this.run('ALTER TABLE trades ADD COLUMN ' + name + ' ' + definition);
+    }
+    await this.run('CREATE TABLE IF NOT EXISTS profile_templates (profile TEXT PRIMARY KEY, version INTEGER NOT NULL, fields TEXT NOT NULL)');
+    console.log('Journal framework ready');
+  }
+
+  private writeTail: Promise<any> = Promise.resolve();
   run(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
+    const result = this.writeTail.then(() => this.rawRun(sql, params));
+    this.writeTail = result.catch(() => {});
+    return result;
+  }
+
+  transaction<T>(work: (run: (sql: string, params?: any[]) => Promise<{ lastID: number; changes: number }>) => Promise<T>): Promise<T> {
+    const result = this.writeTail.then(async () => {
+      await this.rawRun('BEGIN IMMEDIATE');
+      try { const value = await work(this.rawRun.bind(this)); await this.rawRun('COMMIT'); return value; }
+      catch (e) { await this.rawRun('ROLLBACK'); throw e; }
+    });
+    this.writeTail = result.catch(() => {});
+    return result;
+  }
+
+  private rawRun(sql: string, params: any[] = []): Promise<{ lastID: number; changes: number }> {
     return new Promise((resolve, reject) => {
       this.db.run(sql, params, function (err) {
         if (err) reject(err);

@@ -3,8 +3,10 @@ import toast from 'react-hot-toast';
 import { Download, LayoutGrid, List, ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from 'lucide-react';
 import { fetchTrades, fetchTrade, fetchInstruments, fetchTagCategories, deleteTrade } from '../api';
 import type { Instrument, TagCategory, Trade, TradeStatus, ContractType } from '../types';
-import { fmtIST, fmtPnl, pnlClass, snapshotUrl } from '../utils/format';
+import { istDateKey, fmtIST, fmtPnl, pnlClass, snapshotUrl } from '../utils/format';
 import { exportTradesCsv } from '../utils/csv';
+import { profileNames } from '../components/FrameworkFields';
+import TradeViewer from '../components/TradeViewer';
 import TradeForm from '../components/TradeForm';
 
 type ViewMode = 'table' | 'card';
@@ -17,6 +19,8 @@ export default function TradeLog() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>('card');
 
+  const [filterProfile, setFilterProfile] = useState('');
+  const [filterAccount, setFilterAccount] = useState('');
   // Filters
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -30,6 +34,7 @@ export default function TradeLog() {
   const [sortAsc, setSortAsc] = useState(false);
 
   // Card cursor for keyboard navigation
+  const [viewerId, setViewerId] = useState<number | null>(null);
   const [cardCursor, setCardCursor] = useState<number>(0);
 
   // Modal
@@ -51,10 +56,12 @@ export default function TradeLog() {
 
   // Keyboard navigation
   useEffect(() => {
-    if (formOpen || view !== 'card') return;
+    if (formOpen || viewerId !== null || view !== 'card') return;
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) return;
       const len = listRef.current.length;
+      if (!len) return;
+      if (['ArrowRight','ArrowLeft','ArrowDown','ArrowUp'].includes(e.key)) e.preventDefault();
       setCardCursor(c => {
         if (e.key === 'ArrowRight') return Math.min(c + 1, len - 1);
         if (e.key === 'ArrowLeft') return Math.max(c - 1, 0);
@@ -65,14 +72,16 @@ export default function TradeLog() {
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [formOpen, view]);
+  }, [formOpen, view, viewerId]);
 
   const allTags = useMemo(() => tagCategories.flatMap(c => c.tags), [tagCategories]);
 
   const filteredTrades = useMemo(() => {
     return trades
       .filter(t => {
-        if (filterDateFrom && t.entryDateTime.slice(0, 10) < filterDateFrom) return false;
+        if (filterProfile && t.profile !== filterProfile) return false;
+        if (filterAccount && t.account !== filterAccount) return false;
+        if (filterDateFrom && istDateKey(t.entryDateTime) < filterDateFrom) return false;
         if (filterDateTo && t.entryDateTime.slice(0, 10) > filterDateTo) return false;
         if (filterStatus && t.status !== filterStatus) return false;
         if (filterContract && t.contractType !== filterContract) return false;
@@ -86,7 +95,7 @@ export default function TradeLog() {
         const cmp = typeof av === 'number' && typeof bv === 'number' ? av - bv : String(av).localeCompare(String(bv));
         return sortAsc ? cmp : -cmp;
       });
-  }, [trades, filterDateFrom, filterDateTo, filterStatus, filterContract, filterInstrument, filterTag, sortKey, sortAsc]);
+  }, [trades, filterProfile, filterAccount, filterDateFrom, filterDateTo, filterStatus, filterContract, filterInstrument, filterTag, sortKey, sortAsc]);
 
   // Keep latest filtered list in a ref so the keyboard handler never goes stale,
   // and clamp the card cursor when filters shrink the list.
@@ -94,6 +103,17 @@ export default function TradeLog() {
     listRef.current = filteredTrades;
     if (cardCursor > 0 && cardCursor >= filteredTrades.length) setCardCursor(0);
   }, [filteredTrades, cardCursor]);
+
+  const viewerIndex = filteredTrades.findIndex(t => t.id === viewerId);
+  const viewerTrade = filteredTrades[viewerIndex];
+  const closeViewer = useCallback(() => setViewerId(null), []);
+  const navigateViewer = useCallback((step: number) => {
+    const list = listRef.current;
+    if (!list.length) return;
+    const index = list.findIndex(t => t.id === viewerId);
+    const next = (index + step + list.length) % list.length;
+    setCardCursor(next); setViewerId(list[next].id);
+  }, [viewerId]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(a => !a);
@@ -133,8 +153,10 @@ export default function TradeLog() {
 
       {/* Filters */}
       <div className="filters-bar">
+        <div className="form-field"><label>Profile</label><select className="select" value={filterProfile} onChange={e => setFilterProfile(e.target.value)}><option value="">All profiles</option>{Object.entries(profileNames).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></div>
+        <div className="form-field"><label>Account</label><select className="select" value={filterAccount} onChange={e => setFilterAccount(e.target.value)}><option value="">All accounts</option>{[...new Set(trades.map(t => t.account || 'Personal'))].map(a => <option key={a}>{a}</option>)}</select></div>
         <div className="form-field">
-          <label>Search / Date From</label>
+          <label>Date From</label>
           <input type="date" className="input" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)} />
         </div>
         <div className="form-field">
@@ -150,11 +172,11 @@ export default function TradeLog() {
           </select>
         </div>
         <div className="form-field">
-          <label>Contract</label>
+          <label>Asset</label>
           <select className="select" value={filterContract} onChange={e => setFilterContract(e.target.value as any)}>
             <option value="">All</option>
             <option value="CFD">CFD</option>
-            <option value="Futures">Futures</option>
+            <option value="Futures">Futures</option><option value="Option">Option</option><option value="Equity">Equity</option>
           </select>
         </div>
         <div className="form-field">
@@ -223,7 +245,7 @@ export default function TradeLog() {
                 {filteredTrades.map(t => (
                   <tr key={t.id} onDoubleClick={() => openEdit(t.id)}>
                     <td style={{ fontSize: 12 }}>{fmtIST(t.entryDateTime)}</td>
-                    <td>{t.instrumentName}</td>
+                    <td>{t.instrumentName}<small style={{display:'block',color:'#94a3b8'}}>{profileNames[t.profile || 'prop']} · {t.strategy || t.assetType}</small></td>
                     <td><span className={`chip ${t.direction === 'Long' ? 'chip-long' : 'chip-short'}`}>{t.direction}</span></td>
                     <td>{t.quantity}</td>
                     <td style={{ fontVariantNumeric: 'tabular-nums' }}>{t.entryPrice}</td>
@@ -273,8 +295,10 @@ export default function TradeLog() {
                   return (
                     <div key={t.id}
                       className={`trade-card ${isActive ? 'active' : ''}`}
-                      onClick={() => { setCardCursor(i); openEdit(t.id); }}
-                      ref={el => { if (isActive) el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }}
+                      role="button" tabIndex={0} aria-label={'View trade #' + t.id + ' ' + t.instrumentName}
+                      onClick={() => { setCardCursor(i); setViewerId(t.id); }}
+                      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setCardCursor(i); setViewerId(t.id); } }}
+                      ref={el => { if (isActive && viewerId === null) el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }}
                     >
                       <div className="trade-card-thumb">
                         {thumb ? (
@@ -288,7 +312,8 @@ export default function TradeLog() {
                       </div>
                       <div className="trade-card-body">
                         <div className="trade-card-top">
-                          <span className="trade-card-name">{t.instrumentName}</span>
+                          <button className="icon-btn" aria-label={"Edit trade #" + t.id} onClick={e => { e.stopPropagation(); void openEdit(t.id); }}><Pencil size={13} /></button>
+                          <span className="trade-card-name">{t.instrumentName}<small style={{display:'block',color:'#94a3b8'}}>{profileNames[t.profile || 'prop']} · {t.strategy || t.assetType}</small></span>
                           <div className="badges">
                             <span className={`chip ${t.direction === 'Long' ? 'chip-long' : 'chip-short'}`}>{t.direction}</span>
                             <span className={`chip ${t.status === 'Open' ? 'chip-open' : 'chip-closed'}`}>{t.status}</span>
@@ -307,6 +332,8 @@ export default function TradeLog() {
                         )}
                         <div className={`trade-card-pnl ${pnlClass(t.pnl)}`}>
                           {fmtPnl(t.pnl)}
+                          {t.plannedRisk && t.pnl != null ? <small> · {(t.pnl / t.plannedRisk).toFixed(2)}R</small> : null}
+                          {t.status === 'Open' && t.framework?.legs.length ? <small style={{display:'block'}}>Realised {fmtPnl(t.realisedPnl)} · Unrealised {fmtPnl(t.unrealisedPnl)}</small> : null}
                         </div>
                       </div>
                     </div>
@@ -328,6 +355,7 @@ export default function TradeLog() {
         </>
       )}
 
+      {viewerTrade && viewerId !== null && <TradeViewer trade={viewerTrade} position={viewerIndex} count={filteredTrades.length} onNavigate={navigateViewer} onClose={closeViewer} onEdit={id => { closeViewer(); void openEdit(id); }} />}
       {/* Trade form modal */}
       <TradeForm open={formOpen} trade={editTrade} onClose={() => setFormOpen(false)} onSaved={load} />
     </div>

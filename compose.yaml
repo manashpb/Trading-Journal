@@ -1,0 +1,13 @@
+services:
+  journal:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      JOURNAL_USER: ${JOURNAL_USER:?Set JOURNAL_USER in .env}
+      JOURNAL_PASSWORD: ${JOURNAL_PASSWORD:?Set JOURNAL_PASSWORD in .env}
+    volumes:
+      - journal-data:/app/data
+volumes:
+  journal-data:

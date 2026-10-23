@@ -1,7 +1,7 @@
-import type { Instrument, TagCategory, Trade, TradeFilters } from '../types';
+import type { TradeProfile, AnalysisField, Instrument, TagCategory, Trade, TradeFilters } from '../types';
 
 // Relative so the app works from any origin (local dev proxied by Vite, prod served by Nginx)
-const BASE_URL = '/api';
+const BASE_URL = `${import.meta.env.BASE_URL}api`;
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -82,7 +82,7 @@ export async function deleteTagCategory(categoryId: number): Promise<void> {
 }
 
 // ── Snapshots ─────────────────────────────────────────────
-export async function uploadSnapshot(tradeId: number, file: File | Blob, ctx?: { name?: string; entry?: string }): Promise<{ filePath: string }> {
+export async function uploadSnapshot(tradeId: number, file: File | Blob, ctx?: { name?: string; entry?: string }): Promise<{ id:number; filePath: string }> {
   const formData = new FormData();
   formData.append('snapshot', file, file instanceof File ? file.name : 'clipboard.png');
   const qs = new URLSearchParams();
@@ -99,3 +99,5 @@ export async function deleteSnapshot(snapshotId: number): Promise<void> {
 
 // ── CSV export ────────────────────────────────────────────
 export const SNAPSHOT_BASE_URL = '';
+export const fetchProfiles = () => request<TradeProfile[]>('/profiles');
+export const saveProfile = (id: string, fields: AnalysisField[]) => request('/profiles/' + id, { method: 'PUT', body: JSON.stringify({ fields }) });

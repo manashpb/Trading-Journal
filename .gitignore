@@ -29,3 +29,13 @@ Thumbs.db
 # TS build info
 *.tsbuildinfo
 client/src/assets/
+server/journal.db
+server/journal.db-*
+server/snapshots/
+
+.env.*
+!.env.example
+portal.env
+server/trading.db-*
+journal-preview.png
+trade-viewer-preview.png

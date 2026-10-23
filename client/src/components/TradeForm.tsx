@@ -5,6 +5,9 @@ import type { Instrument, Snapshot, TagCategory, Trade } from '../types';
 import { fetchInstruments, fetchTagCategories, createTrade, updateTrade, uploadSnapshot, deleteSnapshot } from '../api';
 import { calcPnl, fmtPnl, snapshotUrl, toLocalInputValue, istDateKey, pnlClass } from '../utils/format';
 
+import { calculateStrategy } from '../../../shared/calculations.js';
+import { FrameworkFields, emptyFramework } from './FrameworkFields';
+
 interface Props {
   open: boolean;
   trade: Trade | null;         // existing trade to edit, else null
@@ -15,7 +18,7 @@ interface Props {
 interface FormState {
   instrumentId: number | '';
   direction: 'Long' | 'Short';
-  contractType: 'CFD' | 'Futures';
+  contractType: 'CFD' | 'Futures' | 'Option' | 'Equity';
   entryDateTime: string;
   entryPrice: string;
   slPrice: string;
@@ -45,6 +48,7 @@ const emptyForm = (): FormState => ({
 });
 
 export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
+  const [extra, setExtra] = useState<Partial<Trade>>({ profile:'prop', holdingStyle:'Intraday', assetType:'CFD', account:'Personal', costs:0, framework:emptyFramework() });
   const [form, setForm] = useState<FormState>(emptyForm());
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [categories, setCategories] = useState<TagCategory[]>([]);
@@ -56,6 +60,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setExtra(trade ? { profile:trade.profile || 'prop', holdingStyle:trade.holdingStyle || 'Intraday', assetType:trade.assetType || trade.contractType, account:trade.account || 'Personal', strategy:trade.strategy || '', costs:trade.costs || 0, plannedRisk:trade.plannedRisk, capitalCommitted:trade.capitalCommitted, multiplier:trade.multiplier, framework:trade.framework || emptyFramework() } : { profile:'prop', holdingStyle:'Intraday', assetType:'CFD', account:'Personal', costs:0, framework:emptyFramework() });
     setForm(trade ? formFromTrade(trade) : emptyForm());
     setSnapshots(trade?.snapshots ?? []);
     fetchInstruments().then(setInstruments).catch(e => toast.error(e.message));
@@ -65,11 +70,16 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm(f => ({ ...f, [key]: value }));
 
+  const legs = extra.framework?.legs || [];
   const selectedInstrument = instruments.find(i => i.id === form.instrumentId);
-  const pnl = selectedInstrument ? calcPnl(
-    { direction: form.direction, entryPrice: Number(form.entryPrice) || 0, exitPrice: form.exitPrice ? Number(form.exitPrice) : null, quantity: Number(form.quantity) || 0, status: form.status },
-    selectedInstrument.pointValue
+  const singlePnl = selectedInstrument ? calcPnl(
+    { direction: form.direction, entryPrice: Number(form.entryPrice) || 0, exitPrice: legs.length ? null : form.exitPrice ? Number(form.exitPrice) : null, quantity: Number(form.quantity) || 0, status: form.status },
+    extra.multiplier ?? selectedInstrument.pointValue
   ) : null;
+  let strategyResult = null;
+  try { strategyResult = legs.length ? calculateStrategy(legs, extra.costs || 0) : null; } catch {}
+  const pnl = legs.length ? (strategyResult ? strategyResult.netRealised : null) : singlePnl == null ? null : singlePnl - (extra.costs || 0);
+  const overnight = extra.profile === 'options_scalping' && form.exitDateTime && form.entryDateTime.slice(0,10) !== form.exitDateTime.slice(0,10);
 
   // Clipboard paste handler
   const handlePaste = useCallback((e: ClipboardEvent) => {
@@ -100,11 +110,11 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
     }
     setSaving(true);
     try {
-      const { filePath } = await uploadSnapshot(trade.id, file, {
+      const { id, filePath } = await uploadSnapshot(trade.id, file, {
         name: trade.instrumentName,
         entry: istDateKey(trade.entryDateTime),
       });
-      setSnapshots(s => [...s, { id: Date.now(), tradeId: trade.id, filePath, createdAt: new Date().toISOString() }]);
+      setSnapshots(s => [...s, { id, tradeId: trade.id, filePath, createdAt: new Date().toISOString() }]);
       toast.success('Snapshot added');
     } catch (e: any) {
       toast.error(`Upload failed: ${e.message}`);
@@ -128,19 +138,20 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
     e.preventDefault();
     if (!form.instrumentId) return toast.error('Please select an instrument');
     if (!form.entryDateTime) return toast.error('Entry date/time is required');
-    if (!form.entryPrice || isNaN(Number(form.entryPrice))) return toast.error('Entry price is required');
-    if (!form.quantity || isNaN(Number(form.quantity))) return toast.error('Quantity is required');
+    if (!legs.length && (!form.entryPrice || isNaN(Number(form.entryPrice)))) return toast.error('Entry price is required');
+    if (!legs.length && (!form.quantity || isNaN(Number(form.quantity)))) return toast.error('Quantity is required');
 
     const payload = {
+      ...extra,
       instrumentId: Number(form.instrumentId),
       direction: form.direction,
-      contractType: form.contractType,
-      entryDateTime: new Date(form.entryDateTime).toISOString(),
-      entryPrice: Number(form.entryPrice),
+      contractType: (extra.assetType || form.contractType) as Trade['contractType'],
+      entryDateTime: new Date(form.entryDateTime + '+05:30').toISOString(),
+      entryPrice: legs.length ? legs[0].entryPrice : Number(form.entryPrice),
       slPrice: form.slPrice ? Number(form.slPrice) : null,
       targetPrice: form.targetPrice ? Number(form.targetPrice) : null,
-      quantity: Number(form.quantity),
-      exitDateTime: form.exitDateTime ? new Date(form.exitDateTime).toISOString() : null,
+      quantity: legs.length ? 1 : Number(form.quantity),
+      exitDateTime: form.exitDateTime ? new Date(form.exitDateTime + '+05:30').toISOString() : null,
       exitPrice: form.exitPrice ? Number(form.exitPrice) : null,
       status: form.status,
       comments: form.comments.trim() || null,
@@ -173,10 +184,18 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
+            <FrameworkFields value={extra} onChange={setExtra} />
+            {overnight && <p role="alert" className="rule-warning">Rule violation: this options scalp was held overnight.</p>}
+            <h4>Trade summary / underlying</h4>
+            {extra.profile === 'options_scalping' && <div className="form-grid">
+              <div className="form-field"><label htmlFor="scalp-option-type">Option type</label><select id="scalp-option-type" className="select" value={extra.framework?.optionType || ''} onChange={e => setExtra(v => ({ ...v, framework: { ...(v.framework || emptyFramework()), optionType: e.target.value as 'CE' | 'PE' | '' } }))}><option value="">— Select —</option><option value="CE">CE</option><option value="PE">PE</option></select></div>
+              <div className="form-field"><label htmlFor="scalp-strike">Strike</label><input id="scalp-strike" type="number" min="0.01" step="any" className="input" value={extra.framework?.strike ?? ''} onChange={e => setExtra(v => ({ ...v, framework: { ...(v.framework || emptyFramework()), strike: e.target.value === '' ? null : Number(e.target.value) } }))} /></div>
+              <div className="form-field"><label htmlFor="scalp-delta">Strike delta</label><input id="scalp-delta" type="number" min="-1" max="1" step="any" className="input" value={extra.framework?.delta ?? ''} onChange={e => setExtra(v => ({ ...v, framework: { ...(v.framework || emptyFramework()), delta: e.target.value === '' ? null : Number(e.target.value) } }))} /></div>
+            </div>}
             <div className="form-grid">
               <div className="form-field">
                 <label>Instrument <span className="req">*</span></label>
-                <select className="select" value={form.instrumentId} onChange={e => set('instrumentId', Number(e.target.value))}>
+                <select className="select" value={form.instrumentId} onChange={e => { set('instrumentId', Number(e.target.value)); setExtra(v => ({ ...v, multiplier: undefined })); }}>
                   <option value="">— Select —</option>
                   {instruments.map(i => <option key={i.id} value={i.id}>{i.name} ({i.type})</option>)}
                 </select>
@@ -190,8 +209,8 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
                 </select>
               </div>
 
-              <div className="form-field">
-                <label>Contract <span className="req">*</span></label>
+              <div className="form-field" style={{display:"none"}}>
+                <label>Legacy contract <span className="req">*</span></label>
                 <select className="select" value={form.contractType} onChange={e => set('contractType', e.target.value as any)}>
                   <option value="CFD">CFD</option>
                   <option value="Futures">Futures</option>
@@ -204,7 +223,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
                   onChange={e => set('entryDateTime', e.target.value)} />
               </div>
 
-              <div className="form-field">
+              <div className="form-field" style={legs.length ? {display:"none"} : undefined}>
                 <label>Entry Price <span className="req">*</span></label>
                 <input type="number" step="0.01" className="input" value={form.entryPrice}
                   onChange={e => set('entryPrice', e.target.value)} placeholder="0.00" />
@@ -222,7 +241,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
                   onChange={e => set('targetPrice', e.target.value)} placeholder="0.00" />
               </div>
 
-              <div className="form-field">
+              <div className="form-field" style={legs.length ? {display:"none"} : undefined}>
                 <label>Quantity <span className="req">*</span></label>
                 <input type="number" step="0.01" className="input" value={form.quantity}
                   onChange={e => set('quantity', e.target.value)} placeholder="0" />
@@ -234,7 +253,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
                   onChange={e => set('exitDateTime', e.target.value)} />
               </div>
 
-              <div className="form-field">
+              <div className="form-field" style={legs.length ? {display:"none"} : undefined}>
                 <label>Exit Price</label>
                 <input type="number" step="0.01" className="input" value={form.exitPrice}
                   onChange={e => set('exitPrice', e.target.value)} placeholder="0.00" />
@@ -250,7 +269,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
 
               <div className="form-field" style={{ justifyContent: 'flex-end' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', fontSize: 13 }}>
-                  <span className="text-muted">PnL (auto):</span>
+                  <span className="text-muted">Net PnL (auto):</span>
                   <span className={pnlClass(pnl)} style={{ fontSize: 18, fontWeight: 700 }}>{pnl != null ? fmtPnl(pnl) : '—'}</span>
                 </div>
               </div>
@@ -373,6 +392,6 @@ function formFromTrade(t: Trade): FormState {
     exitPrice: t.exitPrice != null ? String(t.exitPrice) : '',
     status: t.status,
     comments: t.comments ?? '',
-    tags: t.tags ?? [],
+    tags: (t.tags ?? []).map(Number),
   };
 }

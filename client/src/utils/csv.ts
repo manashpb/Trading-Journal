@@ -10,6 +10,7 @@ function esc(v: string | number | null | undefined): string {
 
 export function tradesToCsv(trades: Trade[]): string {
   const header = [
+    'Profile', 'Account', 'Asset', 'Holding style', 'Strategy', 'Planned risk (INR)', 'Gross PnL (INR)', 'Costs (INR)', 'R multiple', 'Analysis JSON', 'Legs JSON', 'Review', 'Template version', 'Full framework JSON', 'Realised PnL', 'Unrealised PnL', 'Total costs',
     'Trade ID', 'Instrument', 'Contract Type', 'Direction',
     'Entry DateTime (IST)', 'Entry Price', 'SL Price', 'Target Price', 'Quantity',
     'Exit DateTime (IST)', 'Exit Price', 'Status', 'PnL (₹)',
@@ -17,6 +18,7 @@ export function tradesToCsv(trades: Trade[]): string {
   ];
 
   const rows = trades.map(t => [
+    t.profile, t.account, t.assetType, t.holdingStyle, t.strategy, t.plannedRisk, t.grossPnl, t.costs, t.pnl != null && t.plannedRisk ? t.pnl / t.plannedRisk : '', JSON.stringify(t.framework?.analysis || {}), JSON.stringify(t.framework?.legs || []), t.framework?.review, t.framework?.templateVersion, JSON.stringify(t.framework || {}), t.realisedPnl, t.unrealisedPnl, t.totalCosts,
     t.id,
     t.instrumentName ?? '',
     t.contractType,

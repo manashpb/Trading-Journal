@@ -1,12 +1,13 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
+const Dashboard = lazy(() => import('./pages/Dashboard'));
 import TradeLog from './pages/TradeLog';
 import Configuration from './pages/Configuration';
 
 export default function App() {
   return (
-    <Routes>
+    <Suspense fallback={<div className="loading">Loading journal…</div>}><Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -14,6 +15,6 @@ export default function App() {
         <Route path="/configuration" element={<Configuration />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
-    </Routes>
+    </Routes></Suspense>
   );
 }

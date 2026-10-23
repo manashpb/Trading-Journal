@@ -1,7 +1,8 @@
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  base: loadEnv(mode, '.', '').JOURNAL_BASE_PATH || '/',
   plugins: [react()],
   server: {
     port: 5173,
@@ -13,4 +14,4 @@ export default defineConfig({
       '/snapshots': 'http://localhost:5000',
     },
   },
-})
+}))

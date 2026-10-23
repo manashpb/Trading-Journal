@@ -31,8 +31,8 @@ APP_NAME="trading-journal"
 PORT=5000
 DOMAIN=""         # e.g. "journal.example.com" — empty = bind to the server's IP (port 80 default_server)
 NGINX_LISTEN="80" # nginx listen port; use a distinct port per project when you have no domain
-NODE_MAJOR=20     # minimum Node.js major version to ensure
-BACKUP_ENABLED=1  # 1 = install a daily cron backup of trading.db + snapshots
+NODE_MAJOR=22     # minimum Node.js major version to ensure
+BACKUP_ENABLED=1  # 1 = install a daily cron backup of journal.db + snapshots
 # ─────────────────────────────────────────────────────────────────────────────
 
 PUBLIC_IP=""
@@ -118,11 +118,12 @@ npm run setup
 log "Building (server → dist, client → dist)"
 npm run build
 
+[ -f "$APP_DIR/.env" ] || die "Create $APP_DIR/.env with JOURNAL_USER and JOURNAL_PASSWORD before deployment."
 log "Starting backend under pm2"
 if [ -n "$(pm2 id "$APP_NAME" 2>/dev/null | tr -d '[] \n')" ]; then
-  PORT="$PORT" pm2 restart "$APP_NAME" --update-env
+  NODE_ENV=production PORT="$PORT" pm2 restart "$APP_NAME" --update-env --node-args="--env-file=$APP_DIR/.env"
 else
-  PORT="$PORT" pm2 start "$APP_DIR/server/dist/index.js" --name "$APP_NAME"
+  NODE_ENV=production PORT="$PORT" pm2 start "$APP_DIR/server/dist/index.js" --name "$APP_NAME" --node-args="--env-file=$APP_DIR/.env"
 fi
 pm2 save >/dev/null 2>&1 || true
 sudo env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$(id -un)" --hp "$HOME" >/dev/null 2>&1 || true
@@ -162,25 +163,15 @@ server {
     listen {{LISTEN}};
     server_name {{SERVER_NAME}};
 
-    root {{APP_ROOT}};
-    index index.html;
-
+    client_max_body_size 12m;
     location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location /api {
         proxy_pass http://127.0.0.1:{{PORT}};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 60m;
     }
 
-    location /snapshots {
-        proxy_pass http://127.0.0.1:{{PORT}};
-    }
 }
 NGINX
 )
@@ -198,15 +189,15 @@ ok "nginx reloaded"
 
 # ── 5. optional daily backup cron ────────────────────────────────
 if [ "$BACKUP_ENABLED" = "1" ]; then
-  sudo mkdir -p /var/backups
-  cron_line="0 3 * * * tar czf /var/backups/$APP_NAME-\$(date +\%F).tgz -C $APP_DIR/server trading.db snapshots 2>/dev/null || true"
+  backup_dir="/var/backups/$APP_NAME"
+  sudo mkdir -p "$backup_dir"
+  sudo chown "$(id -un):$(id -gn)" "$backup_dir"
+  sudo chmod 700 "$backup_dir"
+  cron_line="0 3 * * * bash $APP_DIR/deploy/backup.sh $APP_DIR $APP_NAME $backup_dir"
   existing="$(crontab -l 2>/dev/null || true)"
-  if printf '%s\n' "$existing" | grep -q "$APP_NAME"; then
-    ok "backup cron already installed for $APP_NAME"
-  else
-    { printf '%s\n' "$existing"; printf '%s\n' "$cron_line"; } | crontab -
-    ok "daily backup cron installed (03:00 server time → /var/backups/$APP_NAME-<date>.tgz)"
-  fi
+  filtered="$(printf '%s\n' "$existing" | grep -v "$APP_NAME" || true)"
+  { printf '%s\n' "$filtered"; printf '%s\n' "$cron_line"; } | crontab -
+  ok "daily consistent backup installed (briefly pauses the app at 03:00 server time)"
 fi
 
 # ── summary ──────────────────────────────────────────────────────
@@ -228,8 +219,8 @@ else
 fi
 echo "  Health:  curl http://127.0.0.1:$PORT/api/health"
 echo
-echo "  Import existing journal data (only if you have a local trading.db):"
+echo "  Import existing journal data (only if you have a local journal.db):"
 echo "    pm2 stop $APP_NAME"
-echo "    scp server/trading.db $(id -un)@$PUBLIC_IP:$APP_DIR/server/"
+echo "    scp server/journal.db $(id -un)@$PUBLIC_IP:$APP_DIR/server/"
 echo "    pm2 start $APP_NAME"
 echo "───────────────────────────────────────────────────────────────"

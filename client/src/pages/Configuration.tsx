@@ -7,6 +7,8 @@ import {
 } from '../api';
 import type { Instrument, TagCategory } from '../types';
 
+import ProfileConfiguration from '../components/ProfileConfiguration';
+
 export default function Configuration() {
   const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [categories, setCategories] = useState<TagCategory[]>([]);
@@ -14,7 +16,7 @@ export default function Configuration() {
 
   // Instruments form state
   const [instName, setInstName] = useState('');
-  const [instType, setInstType] = useState<'CFD' | 'Futures'>('CFD');
+  const [instType, setInstType] = useState<Instrument['type']>('CFD');
   const [instPV, setInstPV] = useState('');
   const [editInst, setEditInst] = useState<Instrument | null>(null);
 
@@ -130,6 +132,7 @@ export default function Configuration() {
         </div>
       </div>
 
+      <ProfileConfiguration />
       {/* ── Instruments ──────────────────────────────────── */}
       <section style={{ marginBottom: 36 }}>
         <h3 style={{ fontSize: 17, fontWeight: 600, marginBottom: 14 }}>Instruments</h3>
@@ -140,13 +143,13 @@ export default function Configuration() {
               <div className="form-field">
                 <label>Instrument Name <span style={{ color: '#f87171' }}>*</span></label>
                 <input className="input" value={instName} onChange={e => setInstName(e.target.value)}
-                  placeholder="e.g. NIFTY 50, EURUSD" />
+                  placeholder="e.g. NIFTY, RELIANCE, EURUSD" />
               </div>
               <div className="form-field">
-                <label>Contract Type <span style={{ color: '#f87171' }}>*</span></label>
+                <label>Asset type <span style={{ color: '#f87171' }}>*</span></label>
                 <select className="select" value={instType} onChange={e => setInstType(e.target.value as any)}>
                   <option value="CFD">CFD</option>
-                  <option value="Futures">Futures</option>
+                  <option value="Futures">Futures</option><option value="Option">Option</option><option value="Equity">Equity</option>
                 </select>
               </div>
               <div className="form-field">

@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+**/*.db
+**/*.db-*
+server/snapshots
+.git
+.env
+framework-*.cjs
+test-results

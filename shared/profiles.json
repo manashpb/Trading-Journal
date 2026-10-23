@@ -1,0 +1,236 @@
+[
+  {
+    "id": "options_scalping",
+    "name": "Options scalping",
+    "holdingStyles": [
+      "Intraday"
+    ],
+    "fields": [
+      {
+        "key": "supportPrice",
+        "label": "Support level price",
+        "type": "number"
+      },
+      {
+        "key": "resistancePrice",
+        "label": "Resistance level price",
+        "type": "number"
+      },
+      {
+        "key": "supportStrength",
+        "label": "Support strength",
+        "type": "select",
+        "options": [
+          "Strong",
+          "Neutral",
+          "Weak"
+        ]
+      },
+      {
+        "key": "resistanceStrength",
+        "label": "Resistance strength",
+        "type": "select",
+        "options": [
+          "Strong",
+          "Neutral",
+          "Weak"
+        ]
+      },
+      {
+        "key": "supportTouches",
+        "label": "Support touches",
+        "type": "number"
+      },
+      {
+        "key": "resistanceTouches",
+        "label": "Resistance touches",
+        "type": "number"
+      },
+      {
+        "key": "oiTrend",
+        "label": "Overall OI trend",
+        "type": "text"
+      },
+      {
+        "key": "preference",
+        "label": "Preferred execution",
+        "type": "select",
+        "options": [
+          "Buying",
+          "Selling",
+          "Neutral"
+        ]
+      },
+      {
+        "key": "trigger",
+        "label": "Entry trigger",
+        "type": "text"
+      },
+      {
+        "key": "supportWeakness",
+        "label": "Support weakness location",
+        "type": "select",
+        "options": [
+          "Top",
+          "Bottom",
+          "Across level",
+          "None"
+        ]
+      },
+      {
+        "key": "resistanceWeakness",
+        "label": "Resistance weakness location",
+        "type": "select",
+        "options": [
+          "Top",
+          "Bottom",
+          "Across level",
+          "None"
+        ]
+      },
+      {
+        "key": "underlyingTrend",
+        "label": "Underlying trend",
+        "type": "text"
+      },
+      {
+        "key": "rejectionQuality",
+        "label": "Rejection quality",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "id": "options_hedged",
+    "name": "Options positional hedge",
+    "holdingStyles": [
+      "Positional"
+    ],
+    "fields": [
+      {
+        "key": "sectorStrength",
+        "label": "Sector strength",
+        "type": "select",
+        "options": [
+          "Strong",
+          "Neutral",
+          "Weak"
+        ]
+      },
+      {
+        "key": "stockBehavior",
+        "label": "Stock behaviour",
+        "type": "text"
+      },
+      {
+        "key": "iv",
+        "label": "IV (%)",
+        "type": "number"
+      },
+      {
+        "key": "ivp",
+        "label": "IV percentile (0–100)",
+        "type": "number"
+      },
+      {
+        "key": "skew",
+        "label": "Skew analysis / measurement basis",
+        "type": "text"
+      },
+      {
+        "key": "eventContext",
+        "label": "Event context",
+        "type": "text"
+      },
+      {
+        "key": "adjustmentPlan",
+        "label": "Adjustment conditions",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "id": "prop",
+    "name": "Prop trades",
+    "holdingStyles": [
+      "Intraday",
+      "Swing"
+    ],
+    "fields": [
+      {
+        "key": "stage",
+        "label": "Account stage",
+        "type": "select",
+        "options": [
+          "Evaluation",
+          "Funded"
+        ]
+      },
+      {
+        "key": "session",
+        "label": "Trading session",
+        "type": "text"
+      },
+      {
+        "key": "dailyLossRemaining",
+        "label": "Daily loss remaining at entry (INR)",
+        "type": "number"
+      },
+      {
+        "key": "drawdownBuffer",
+        "label": "Drawdown buffer at entry (INR)",
+        "type": "number"
+      },
+      {
+        "key": "rules",
+        "label": "Firm rules / adherence",
+        "type": "text"
+      }
+    ]
+  },
+  {
+    "id": "cash",
+    "name": "Cash stocks",
+    "holdingStyles": [
+      "Intraday",
+      "Swing"
+    ],
+    "fields": [
+      {
+        "key": "previousMove",
+        "label": "Previous move (direction, size, time window)",
+        "type": "text"
+      },
+      {
+        "key": "sectorStrength",
+        "label": "Sector strength",
+        "type": "select",
+        "options": [
+          "Strong",
+          "Neutral",
+          "Weak"
+        ]
+      },
+      {
+        "key": "breadth",
+        "label": "Market breadth",
+        "type": "text"
+      },
+      {
+        "key": "relativeStrength",
+        "label": "Relative strength",
+        "type": "text"
+      },
+      {
+        "key": "volume",
+        "label": "Volume context",
+        "type": "text"
+      },
+      {
+        "key": "overnightContext",
+        "label": "Overnight / event context",
+        "type": "text"
+      }
+    ]
+  }
+]

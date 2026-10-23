@@ -18,6 +18,7 @@ export function instrumentRoutes(db: Database): Router {
   router.post('/', async (req, res) => {
     try {
       const { name, type, pointValue } = req.body;
+      if (typeof name !== 'string' || !name.trim() || !['CFD','Futures','Option','Equity'].includes(type) || typeof pointValue !== 'number' || !Number.isFinite(pointValue) || pointValue <= 0) return res.status(400).json({ error:'Instrument needs a name, asset type and positive point value' });
       const result = await db.run(
         `INSERT INTO instruments (name, type, pointValue) VALUES (?, ?, ?)`,
         [name, type, pointValue]

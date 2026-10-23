@@ -79,7 +79,7 @@ export function toLocalInputValue(dt: string | null | undefined): string {
 
 /** Snapshot URL for display (relative to the app origin). */
 export function snapshotUrl(relPath: string): string {
-  return `/snapshots/${relPath.replace(/\\/g, '/')}`;
+  return `${import.meta.env.BASE_URL}snapshots/${relPath.replace(/\\/g, '/')}`;
 }
 
 export function downloadFile(content: BlobPart, filename: string, mime = 'application/octet-stream') {

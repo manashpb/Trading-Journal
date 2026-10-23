@@ -4,6 +4,7 @@ import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell,
 } from 'recharts';
+import { profileNames } from '../components/FrameworkFields';
 import { fetchTrades } from '../api';
 import type { Trade } from '../types';
 import { fmtMoney, fmtPnl, fmtIST, istDateKey, pnlClass } from '../utils/format';
@@ -22,7 +23,10 @@ interface DayStat {
 }
 
 export default function Dashboard() {
-  const [trades, setTrades] = useState<Trade[]>([]);
+  const [allTrades, setTrades] = useState<Trade[]>([]);
+  const [profile, setProfile] = useState('');
+  const [account, setAccount] = useState('');
+  const trades = useMemo(() => allTrades.filter(t => (!profile || t.profile === profile) && (!account || t.account === account)), [allTrades, profile, account]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,6 +61,7 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="filters-bar"><div className="form-field"><label>Profile</label><select className="select" value={profile} onChange={e => setProfile(e.target.value)}><option value="">All profiles</option>{Object.entries(profileNames).map(([id,name]) => <option key={id} value={id}>{name}</option>)}</select></div><div className="form-field"><label>Account</label><select className="select" value={account} onChange={e => setAccount(e.target.value)}><option value="">All accounts (INR)</option>{[...new Set(allTrades.map(t => t.account || 'Personal'))].map(a => <option key={a}>{a}</option>)}</select></div></div>
       {/* KPI tiles */}
       <div className="stats-grid">
         <StatTile label="Total Trades" value={String(stats.total)} hint={`${stats.open} open`} />
@@ -301,11 +306,11 @@ function computeStats(trades: Trade[]) {
 }
 
 function buildEquityCurve(trades: Trade[]) {
-  const sorted = [...trades].sort((a, b) => a.entryDateTime.localeCompare(b.entryDateTime));
+  const sorted = trades.filter(t => t.status === 'Closed' && t.pnl != null).sort((a, b) => (a.exitDateTime || a.entryDateTime).localeCompare(b.exitDateTime || b.entryDateTime));
   let equity = 0;
   return sorted.map((t, i) => {
     equity += t.pnl ?? 0;
-    return { label: `#${i + 1}`, date: fmtIST(t.entryDateTime), equity: Math.round(equity * 100) / 100 };
+    return { label: `#${i + 1}`, date: fmtIST(t.exitDateTime), equity: Math.round(equity * 100) / 100 };
   });
 }
 

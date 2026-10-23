@@ -23,7 +23,7 @@ export default function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-footer">Prop Firm Journaler</div>
+        <div className="sidebar-footer">Four profiles · One journal</div>
       </aside>
       <main className="main">
         <Outlet />

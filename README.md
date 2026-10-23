@@ -1,61 +1,74 @@
-# Trading Journal — Prop Firm Edition
+# Trading Journal
 
-A self-hosted trading journal for **futures & CFD** prop-firm trades with a dashboard, detailed trade log, snapshot management, and full configuration.
+A self-hosted React + Express + SQLite journal with four recording profiles: options scalping (intraday), options positional hedges, prop trades, and cash stocks (intraday/swing).
 
-## Tech Stack
+## Start locally
 
-| Layer     | Choice                                    |
-|-----------|-------------------------------------------|
-| Frontend  | Vite + React 18 + TypeScript              |
-| Charts    | Recharts                                  |
-| Backend   | Node.js + Express (TypeScript)            |
-| Database  | SQLite (file-based, **trading.db**)       |
-| Uploads   | Multer → `server/snapshots/`              |
+Requires Node.js 22 or later.
 
-## Pages
-
-1. **Dashboard** — equity curve, KPI tiles, PnL by instrument, monthly PnL, win/loss donut, **day-wise PnL calendar** (IST), recent trades.
-2. **Trade Log** — add/edit trades in a modal, **table ⇄ card views**, card thumbnails of snapshots, **keyboard navigation** (← → ↑ ↓ in card view), filtering (date range, status, contract, instrument, tag), column sorting, **CSV export** (with snapshot paths & semicolon-separated tags).
-3. **Configuration** — manage instruments (name, CFD/Futures, ₹ per-point PnL) and **tag categories + tags**, which appear in the trade form & filters.
-
-## Quick Start
-
-```bash
-# 1. Install dependencies (server + client)
+```sh
+npm install
 npm run setup
-
-# 2. Run both server and client concurrently
 npm run dev
 ```
 
-Then open **http://localhost:5173** (Vite) — the API runs on **http://localhost:5000**.
+Open http://localhost:5173. The API runs on port 5000. For the built app:
 
-Or run them separately:
-
-```bash
-npm run dev:server   # API on :5000
-npm run dev:client   # UI on :5173
+```sh
+npm run build
+npm start
 ```
 
-### First-time setup
+Open http://localhost:5000. Express serves both frontend and API.
 
-1. Go to **Configuration** and add your instruments (e.g. NIFTY 50 — Futures — ₹25/pt). Set the **₹ per-point PnL** — this drives auto PnL calculation.
-2. Add tag categories + tags (e.g. "Setup Type" → breaking-move, pullback, rangefade…).
-3. Head to **Trade Log**, click **New Trade**, fill the form, and you're journaling.
+## Recording workflow
 
-## Features
+1. In Configuration, add instruments/underlyings with their asset type and value per price point per quantity unit. Equity and option prices recorded per unit normally use multiplier 1; lot quantities require the captured lot size instead. Do not apply both conventions at once.
+2. Choose a profile, then enter account, holding style, strategy, planned risk, costs and entry analysis.
+3. For options, add contracts with expiry, strike, Call/Put, buy/sell, quantity and multiplier. Hedges require at least two legs.
+4. Simple positions use entry/exit summaries. For scaling or partial exits, add timestamped Entry/Exit fills to each leg. Fills override that leg's summary prices and quantities. Fill costs and additional trade costs are added once.
+5. Close a trade after every leg closes. Open strategies show realised P&L and optional unrealised P&L from manually entered mark prices. No live market feed is connected.
+6. Keep entry thesis separate from exit reason and review. Adjustment notes can include timestamps and reasons; financial adjustments must also be reflected in leg fills or new legs.
+7. Save, reopen, then upload screenshots or paste images from the clipboard.
 
-- **Auto PnL**: for Closed trades, `PnL = (exit − entry) × qty × pointValue` (sign depends on Long/Short). Recalc happens server-side on save/update.
-- **Everything in IST**: timestamps stored as ISO UTC and rendered in `Asia/Kolkata`; the calendar and CSV are keyed to IST.
-- **Snapshots**: upload images or **Ctrl+V** a screenshot straight into the trade modal. Stored under `server/snapshots/{YYYYMMDD}_{Instrument}_{tradeId}/img_001.png` — folders line up serially in the file browser. Multiple per trade; view/delete any time.
-- **CSV export** honors current filters and includes `Snapshot Paths` and `Tags (semicolon-separated)` columns.
-- **Extensible**: the dashboard page is self-contained — add new analysis cards/widgets without touching other pages.
+All monetary values are **INR**. Convert non-INR figures consistently before recording; automatic FX conversion is not implemented. Planned risk is a manual entry, not inferred maximum loss. R multiple uses closed net P&L / planned risk. Overnight scalps are flagged as rule violations but remain recordable.
 
-## Paths
+## Custom templates
 
-| Item            | Location                                       |
-|-----------------|------------------------------------------------|
-| Database        | `server/trading.db`                            |
-| Snapshot images | `server/snapshots/`                            |
-| API             | `http://localhost:5000/api`                    |
-| Frontend        | `client/src/`                                  |
+Configuration includes a field editor for each profile. Fields support text, numbers and dropdowns. Use stable keys and consistent measurement definitions. Saving creates a template version. Existing trades retain their original definitions/version when edited; new trades use the latest template. Changing an existing trade's profile resets its analysis values and legs and applies the new template.
+
+Leave unknown values blank. Observation time and source provide context. Entry analysis remains editable; this personal journal is not an immutable audit system.
+
+## Data and calculations
+
+The fresh framework uses `server/journal.db`; previous `server/trading.db` is untouched and not imported. Screenshots use `server/snapshots/` unless configured otherwise.
+
+Shared trade identity, risk, costs and totals are SQLite columns. Versioned analysis, legs and executions are stored as a validated JSON trade aggregate. Trade/tag writes are transactional. Multipliers are captured with trades/legs so instrument configuration changes do not alter historical calculations.
+
+Execution accounting uses weighted average entry cost per leg, timestamp ordering and buy/sell sign. Exits cannot exceed open quantity. Dashboard totals include closed net results; open partial realised results appear on trade cards. The equity curve represents cumulative closed P&L, not broker account equity.
+
+Trade Log and Dashboard filter by profile/account. CSV exports include profile, risk, costs, R multiple and full framework JSON with analysis and fills.
+
+## Verification
+
+```sh
+npm run build
+npm test
+```
+
+Integration tests start an isolated server and temporary database, checking profiles, multi-leg P&L, partial exits, invalid inputs, template history, atomic rollback, authentication and production frontend serving.
+
+## Remote deployment
+
+See [deploy/README.md](deploy/README.md). Nothing is automatically published.
+
+| Variable | Default / purpose |
+| --- | --- |
+| `PORT` | `5000` |
+| `DB_PATH` | `server/journal.db` |
+| `SNAPSHOTS_DIR` | `server/snapshots` |
+| `JOURNAL_USER` | HTTP Basic authentication username |
+| `JOURNAL_PASSWORD` | HTTP Basic authentication password |
+| `NODE_ENV` | Set `production` for hosting; credentials are then required |
+
+Use HTTPS at the reverse proxy. Authentication protects frontend, API and images; `/api/health` returns only health status and stays public. This is a single-owner journal without separate user accounts or tenant isolation.
