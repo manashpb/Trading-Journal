@@ -1,5 +1,7 @@
 # Remote deployment
 
+For the deployed EC2 shared login portal, Trading Journal and FNO Analyzer, use [the server operations guide](WORKSPACE.md). It includes both repositories' update procedures. The standalone examples below do not configure the shared portal.
+
 Run this private single-owner journal with Docker, or Node.js 22+ behind Nginx. API and frontend URLs are relative; no hostname is hardcoded in the client.
 
 ## Docker (recommended)

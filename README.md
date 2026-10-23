@@ -60,7 +60,7 @@ Integration tests start an isolated server and temporary database, checking prof
 
 ## Remote deployment
 
-See [deploy/README.md](deploy/README.md). Nothing is automatically published.
+For the deployed EC2 shared login portal and updates to both apps, see [the server operations guide](deploy/WORKSPACE.md). Standalone deployment alternatives are in [deploy/README.md](deploy/README.md). Nothing is automatically published.
 
 | Variable | Default / purpose |
 | --- | --- |
