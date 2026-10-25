@@ -60,7 +60,7 @@ Integration tests start an isolated server and temporary database, checking prof
 
 ## Remote deployment
 
-For the deployed EC2 shared login portal and updates to both apps, see [the server operations guide](deploy/WORKSPACE.md). Standalone deployment alternatives are in [deploy/README.md](deploy/README.md). Nothing is automatically published.
+The shared login portal and Nginx routing are owned by [VCCL Workspace](../workspace/README.md). Its [deployment guide](../workspace/docs/DEPLOYMENT.md) covers the independent portal lifecycle and server cutover. This journal builds and runs independently; its updates do not restart the portal. Standalone journal deployment alternatives are in [deploy/README.md](deploy/README.md). Nothing is automatically published.
 
 | Variable | Default / purpose |
 | --- | --- |
