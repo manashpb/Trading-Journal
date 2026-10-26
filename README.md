@@ -49,6 +49,16 @@ Execution accounting uses weighted average entry cost per leg, timestamp orderin
 
 Trade Log and Dashboard filter by profile/account. CSV exports include profile, risk, costs, R multiple and full framework JSON with analysis and fills.
 
+## Text trade entry
+
+Open **New Trade → Text** to edit a YAML trade instead of filling out the form. Choose a template profile and click **Load template** for prop, options scalping, positional hedge, or cash fields. Comments list current instruments, profile choices, analysis dropdown options, and tags from Configuration. Generating a fresh template replaces the current text after a warning.
+
+Use exact instrument and tag names, quote names containing YAML punctuation, and enter times as `YYYY-MM-DD HH:mm` in IST. Blank optional values mean not recorded. Unknown keys, invalid choices, invalid dates, missing required values, and inconsistent option legs block creation and show line numbers. Closed trades need an exit time and exit prices; hedged trades need at least two legs. P&L and a readable preview update as the text becomes valid.
+
+Tags are grouped by category, e.g. `tags: {Setup: [Breakout]}`. Click tag chips below the editor to add/remove selections in the YAML; existing comments are preserved. Duplicate category or instrument names must be made unique in Configuration to use them in text entry.
+
+**Download text** saves the current draft as `new-trade.yaml`. Edit it externally and use **Load file** to load `.yaml`, `.yml`, or `.txt` files (maximum 256 KB). Form and Text maintain separate drafts. Text survives tab changes, closing/reopening the trade dialog, and failed saves within the same page session; refreshing the page clears it, so download drafts you want to keep. Click **Create New Trade** to save through the normal trade API. Add snapshots afterward by editing the created trade. The feature does not place broker orders.
+
 ## Verification
 
 ```sh
@@ -56,7 +66,7 @@ npm run build
 npm test
 ```
 
-Integration tests start an isolated server and temporary database, checking profiles, multi-leg P&L, partial exits, invalid inputs, template history, atomic rollback, authentication and production frontend serving.
+Text entry tests check generated templates, YAML errors, unknown fields, IST dates, dropdown choices, category-based tags, tag chips, and strategy validation. Integration tests start an isolated server and temporary database, checking profiles, multi-leg P&L, partial exits, invalid inputs, template history, atomic rollback, authentication and production frontend serving.
 
 ## Remote deployment
 

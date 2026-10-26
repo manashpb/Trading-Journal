@@ -7,6 +7,7 @@ import { calcPnl, fmtPnl, snapshotUrl, toLocalInputValue, istDateKey, pnlClass }
 
 import { calculateStrategy } from '../../../shared/calculations.js';
 import { FrameworkFields, emptyFramework } from './FrameworkFields';
+import TextTradeEntry from './TextTradeEntry';
 
 interface Props {
   open: boolean;
@@ -48,6 +49,10 @@ const emptyForm = (): FormState => ({
 });
 
 export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
+  const [mode, setMode] = useState<'form' | 'text'>('form');
+  const [textDraft, setTextDraft] = useState('');
+  const [textReady, setTextReady] = useState(false);
+  const [textLoadError, setTextLoadError] = useState('');
   const [extra, setExtra] = useState<Partial<Trade>>({ profile:'prop', holdingStyle:'Intraday', assetType:'CFD', account:'Personal', costs:0, framework:emptyFramework() });
   const [form, setForm] = useState<FormState>(emptyForm());
   const [instruments, setInstruments] = useState<Instrument[]>([]);
@@ -60,11 +65,18 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
 
   useEffect(() => {
     if (!open) return;
+    setMode('form');
+    setTextReady(false);
+    setTextLoadError('');
     setExtra(trade ? { profile:trade.profile || 'prop', holdingStyle:trade.holdingStyle || 'Intraday', assetType:trade.assetType || trade.contractType, account:trade.account || 'Personal', strategy:trade.strategy || '', costs:trade.costs || 0, plannedRisk:trade.plannedRisk, capitalCommitted:trade.capitalCommitted, multiplier:trade.multiplier, framework:trade.framework || emptyFramework() } : { profile:'prop', holdingStyle:'Intraday', assetType:'CFD', account:'Personal', costs:0, framework:emptyFramework() });
     setForm(trade ? formFromTrade(trade) : emptyForm());
     setSnapshots(trade?.snapshots ?? []);
-    fetchInstruments().then(setInstruments).catch(e => toast.error(e.message));
-    fetchTagCategories().then(setCategories).catch(e => toast.error(e.message));
+    let active = true;
+    Promise.all([fetchInstruments(), fetchTagCategories()]).then(([items, tags]) => {
+      if (!active) return;
+      setInstruments(items); setCategories(tags); setTextReady(true);
+    }).catch(e => { if (active) { toast.error(e.message); setTextLoadError(e.message); } });
+    return () => { active = false; };
   }, [open, trade]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -136,6 +148,7 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving || mode === 'text') return;
     if (!form.instrumentId) return toast.error('Please select an instrument');
     if (!form.entryDateTime) return toast.error('Entry date/time is required');
     if (!legs.length && (!form.entryPrice || isNaN(Number(form.entryPrice)))) return toast.error('Entry price is required');
@@ -182,7 +195,15 @@ export default function TradeForm({ open, trade, onClose, onSaved }: Props) {
           <button className="icon-btn" onClick={onClose} disabled={saving}><X size={16} /></button>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        {!trade && <div className="trade-entry-tabs" role="tablist" aria-label="Trade entry method">
+          <button id="trade-form-tab" type="button" role="tab" aria-selected={mode === 'form'} aria-controls="trade-form-panel" className={`btn ${mode === 'form' ? 'btn-primary' : ''}`} disabled={saving} onClick={() => setMode('form')}>Form</button>
+          <button id="trade-text-tab" type="button" role="tab" aria-selected={mode === 'text'} aria-controls="trade-text-panel" className={`btn ${mode === 'text' ? 'btn-primary' : ''}`} disabled={saving} onClick={() => setMode('text')}>Text</button>
+        </div>}
+        {!trade && <div id="trade-text-panel" role="tabpanel" aria-labelledby="trade-text-tab" hidden={mode !== 'text'} className="text-trade-panel">
+          <TextTradeEntry instruments={instruments} categories={categories} ready={textReady} loadError={textLoadError} draft={textDraft} onDraft={setTextDraft} saving={saving} onSaving={setSaving} onSaved={onSaved} onClose={onClose} />
+        </div>}
+
+        <form id="trade-form-panel" role="tabpanel" aria-labelledby={!trade ? 'trade-form-tab' : undefined} hidden={!trade && mode !== 'form'} onSubmit={handleSubmit}>
           <div className="modal-body">
             <FrameworkFields value={extra} onChange={setExtra} />
             {overnight && <p role="alert" className="rule-warning">Rule violation: this options scalp was held overnight.</p>}

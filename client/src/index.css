@@ -535,3 +535,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .form-grid-3 { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
+.trade-entry-tabs { display: flex; gap: 8px; padding: 12px 24px 0; }
+.text-trade-panel, .text-trade-entry { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
+.text-trade-entry > .modal-body > p { margin: 0 0 12px; }
+.text-trade-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.text-trade-toolbar .select { width: auto; max-width: 100%; }
+.text-trade-editor { width: 100%; min-height: 400px; margin: 6px 0 16px; font-family: Consolas, monospace; font-size: 13px; line-height: 1.65; tab-size: 2; }
+.text-trade-tags { margin-bottom: 16px; }
+.text-trade-preview { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 14px; overflow-wrap: anywhere; }
+.text-trade-preview ul { padding-left: 20px; max-height: 220px; overflow: auto; }
+.text-trade-preview p { margin: 8px 0; }
+[hidden] { display: none !important; }

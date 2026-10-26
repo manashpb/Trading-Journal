@@ -10,7 +10,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build": "npm run build --prefix server && npm run build --prefix client",
     "start": "npm run start --prefix server",
-    "test": "node tests/framework.test.mjs"
+    "test": "node tests/text-trade.test.mjs && node tests/framework.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
