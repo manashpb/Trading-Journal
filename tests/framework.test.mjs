@@ -17,7 +17,14 @@ async function request(url, method = 'GET', body, status = 200) {
   const data = await res.json(); assert.equal(res.status,status, JSON.stringify(data)); return data;
 }
 try {
-  for (let i=0; i<100; i++) { try { if ((await fetch(base+'/api/health')).ok) break; } catch {} await new Promise(r=>setTimeout(r,100)); }
+  // Fresh SQLite migrations can take longer on a cloud disk than on local SSDs.
+  let ready = false;
+  for (let i=0; i<600; i++) {
+    if (child.exitCode !== null || child.signalCode !== null) throw new Error('Test server exited before startup');
+    try { if ((await fetch(base+'/api/health')).ok) { ready = true; break; } } catch {}
+    await new Promise(r=>setTimeout(r,100));
+  }
+  assert.ok(ready, 'Test server did not become ready within 60 seconds');
   assert.equal((await fetch(base+'/api/trades')).status,401);
   assert.equal((await fetch(base+'/trades')).status,401);
   const html = await fetch(base+'/trades',{headers:{Authorization:'Basic '+Buffer.from('test:test-password').toString('base64')}});
